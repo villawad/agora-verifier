@@ -18,6 +18,8 @@ proguardSettings
 
 ProguardKeys.options in Proguard ++= Seq("-dontnote", "-dontwarn", "-ignorewarnings")
 
+// ProguardKeys.options in Proguard ++= Seq("-dontnote", "-dontwarn", "-ignorewarnings", "-dontobfuscate", "-dontoptimize")
+
 ProguardKeys.options in Proguard += ProguardOptions.keepMain("org.agoravoting.agora.Verifier")
 
 ProguardKeys.options in Proguard += "-keep class verificatum.crypto.RandomDevice { *; }"
@@ -25,6 +27,18 @@ ProguardKeys.options in Proguard += "-keep class verificatum.crypto.RandomDevice
 ProguardKeys.options in Proguard += "-keep class verificatum.arithm.ModPGroup { *; }"
 
 ProguardKeys.options in Proguard += "-keep class verificatum.crypto.RandomDeviceGen { *; }"
+
+ProguardKeys.options in Proguard += "-keep class * implements com.fasterxml.jackson.databind.cfg.ConfigFeature {*;}"
+
+ProguardKeys.options in Proguard += "-keep class * implements com.fasterxml.jackson.databind.jsontype.TypeIdResolver {*;}"
+
+ProguardKeys.options in Proguard += "-keep class scala.concurrent.forkjoin.ForkJoinPool {*;}"
+
+ProguardKeys.options in Proguard += "-keep class scala.concurrent.forkjoin.ForkJoinWorkerThread {*;}"
+
+ProguardKeys.options in Proguard += "-keep class scala.concurrent.forkjoin.ForkJoinTask {*;}"
+
+ProguardKeys.options in Proguard += "-keep class scala.concurrent.forkjoin.LinkedTransferQueue {*;}"
 
 ProguardKeys.inputFilter in Proguard := { file =>
   file.name match {
