@@ -26,4 +26,4 @@ this will generate an executable agora-verifier
 Running
 ==============
 
-agora-verifier <tally.tar.gz>
+agora-verifier <<tally.tar.gz>>
