@@ -8,6 +8,7 @@ then
 fi
 base=`basename $0`;
 path=$(mktemp -d)
-tally=$(realpath $1)
+tally=$(echo $(dirname $(readlink -e $1))/$(basename $1))
+
 (cd $path; uudecode -o /dev/stdout $dir/$base | tar zxf -; cd $path/agora-verifier/; python verify.py $tally)
 exit 0;
