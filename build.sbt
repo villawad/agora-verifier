@@ -25,3 +25,10 @@ ProguardKeys.options in Proguard += "-keep class verificatum.crypto.RandomDevice
 ProguardKeys.options in Proguard += "-keep class verificatum.arithm.ModPGroup { *; }"
 
 ProguardKeys.options in Proguard += "-keep class verificatum.crypto.RandomDeviceGen { *; }"
+
+ProguardKeys.inputFilter in Proguard := { file =>
+  file.name match {
+    case "verificatum.jar" => Some("!**/safe_prime_table.txt")
+    case _ => Some("!META-INF/**")
+  }
+}
