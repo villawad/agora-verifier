@@ -53,7 +53,7 @@ def verify_pok_plaintext(pk, proof, ciphertext):
     # check g^response == commitment * (g^t) ^ challenge == commitment * (alpha) ^ challenge
     assert first_part == second_part
 
-def verify_votes_pok(pubkeys, path, tally):
+def verify_votes_pok(pubkeys, path, tally, hash):
     with open(path, mode='r') as votes_file:
         num_questions = len(tally['counts'])
 
@@ -61,10 +61,20 @@ def verify_votes_pok(pubkeys, path, tally):
             pubkeys[i]['g'] = int(pubkeys[i]['g'])
             pubkeys[i]['p'] = int(pubkeys[i]['p'])
 
+        found = False
         for line in votes_file:
             vote = json.loads(line)
-            for i in xrange(num_questions):
-                verify_pok_plaintext(pubkeys[i], vote['proofs'][i], vote['choices'][i])
+            if hash and not found and hashlib.sha256(line[:-1]).hexdigest() == hash:
+                found = True
+                print("* Hash of the vote was successfully found")
+
+            if not hash or (hash is not None and found):
+                for i in xrange(num_questions):
+                    verify_pok_plaintext(pubkeys[i], vote['proofs'][i], vote['choices'][i])
+
+        if hash is not None and not found:
+            print("* ERROR: vote hash %s NOT FOUND" % hash)
+            sys.exit(1)
 
 if __name__ == "__main__":
     RANDOM_SOURCE=".rnd"
@@ -72,6 +82,13 @@ if __name__ == "__main__":
     # untar the plaintexts
     dir_path = mkdtemp("tally")
     tally_gz = tarfile.open(sys.argv[1], mode="r:gz")
+
+    # second argument is the hash of the vote
+    hash = None
+    if len(sys.argv) > 2:
+        hash = sys.argv[2]
+        print("* Vote hash %s given, we will search the corresponding ballot.." % hash)
+
     tally_gz.extractall(path=dir_path)
     print("* extracted to " + dir_path)
 
@@ -81,8 +98,12 @@ if __name__ == "__main__":
     pubkeys_path = os.path.join(dir_path, "pubkeys_json")
     pubkeys = json.loads(open(pubkeys_path).read())
     print("* verifying proofs of knowledge of the plaintexts...")
-    verify_votes_pok(pubkeys, os.path.join(dir_path, 'ciphertexts_json'), tally)
+    verify_votes_pok(pubkeys, os.path.join(dir_path, 'ciphertexts_json'), tally, hash)
     print("* proofs of knowledge of plaintexts OK")
+
+    if hash is not None:
+        print("* ballot hash verification OK")
+        sys.exit(0)
 
     tallyfile = dir_path + "/result_json"
 
@@ -93,9 +114,6 @@ if __name__ == "__main__":
         sys.exit(0)
 
     print("* tally verification OK")
-
-
-
 
     print "* running './pverify.sh " + RANDOM_SOURCE + " " + dir_path + "'"
     subprocess.call(['./pverify.sh', RANDOM_SOURCE, dir_path])
