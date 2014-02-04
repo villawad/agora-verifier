@@ -111,9 +111,46 @@ if __name__ == "__main__":
     hashtwo = hashlib.md5(tally_s).hexdigest()
     if (hashone != hashtwo):
         print("* tally verification FAILED")
-        sys.exit(0)
+        sys.exit(1)
 
     print("* tally verification OK")
 
-    print "* running './pverify.sh " + RANDOM_SOURCE + " " + dir_path + "'"
+    print("* running './pverify.sh " + RANDOM_SOURCE + " " + dir_path + "'")
     subprocess.call(['./pverify.sh', RANDOM_SOURCE, dir_path])
+
+    # check if plaintexts_json is generated correctly from the already verified
+    # plaintexts raw proofs
+    i = 0
+    ldir = os.listdir(dir_path)
+    ldir.sort()
+    for question_dir in ldir:
+        question_path = os.path.join(dir_path, question_dir)
+        if not os.path.isdir(question_path):
+            continue
+
+        print "* processing question_dir " + question_dir
+
+        if not question_dir.startswith("%d-" % i):
+            print("* invalid question dirname FAILED")
+            sys.exit(1)
+
+        if i >= len(tally["counts"]):
+            print("* invalid question dirname FAILED")
+            sys.exit(1)
+
+
+        print("* running 'vmnc -plain -outi json proofs/PlaintextElements.bt "
+              "plaintexts_json2'")
+        subprocess.call(["vmnc", "-plain", "-outi", "json",
+                        "proofs/PlaintextElements.bt", "plaintexts_json2"],
+                        cwd=question_path)
+        path1 = os.path.join(dir_path, question_dir, "plaintexts_json")
+        path2 = os.path.join(dir_path, question_dir, "plaintexts_json2")
+
+        hash1 = hashlib.md5(open(path1).read()).hexdigest()
+        hash2 = hashlib.md5(open(path2).read()).hexdigest()
+        if (hash1 != hash2):
+            print("* plaintexts_json generation FAILED")
+            sys.exit(1)
+        print("* plaintexts_json generation OK")
+        i += 1
