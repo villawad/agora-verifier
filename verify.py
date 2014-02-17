@@ -66,7 +66,7 @@ def verify_votes_pok(pubkeys, path, tally, hash):
             vote = json.loads(line)
             if hash and not found and hashlib.sha256(line[:-1]).hexdigest() == hash:
                 found = True
-                print("* Hash of the vote was successfully found")
+                print("* Hash of the vote was successfully found: %s" % line)
 
             if not hash or (hash is not None and found):
                 for i in xrange(num_questions):
