@@ -95,6 +95,18 @@ if __name__ == "__main__":
     tally = tally.do_dirtally(dir_path)
     tally_s = json.dumps(tally)
 
+    print("# Results ##########################################")
+    i = 1
+    for q in tally['counts']:
+        print("Question #%d: %s\n" % (i, q['question']))
+        i += 1
+        print("total number of votes (including invalid ones): %d" % q['total_votes'])
+        print("number of options available: %d" % len(q['answers']))
+        print("\nWinning options:")
+        for opt in q['winners']:
+            print(" - %s" % opt)
+        print("####################################################\n")
+
     pubkeys_path = os.path.join(dir_path, "pubkeys_json")
     pubkeys = json.loads(open(pubkeys_path).read())
     print("* verifying proofs of knowledge of the plaintexts...")
