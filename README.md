@@ -10,7 +10,7 @@ You need
 
 * java
 * sbt
-* the agora-verifier direcotry of the agora-tally project
+* the agora_tally directory of the agora-tally project
 * the openstv project (git clone)
 
 Packaging

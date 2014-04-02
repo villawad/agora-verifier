@@ -4,6 +4,7 @@ from agora_tally import tally
 import sys
 import os
 import hashlib
+import shutil
 import subprocess
 import json
 import tarfile
@@ -57,7 +58,7 @@ def verify_votes_pok(pubkeys, path, tally, hash):
     with open(path, mode='r') as votes_file:
         num_questions = len(tally['counts'])
 
-        for i in xrange(num_questions):
+        for i in range(num_questions):
             pubkeys[i]['g'] = int(pubkeys[i]['g'])
             pubkeys[i]['p'] = int(pubkeys[i]['p'])
 
@@ -69,12 +70,12 @@ def verify_votes_pok(pubkeys, path, tally, hash):
                 print("* Hash of the vote was successfully found: %s" % line)
 
             if not hash or (hash is not None and found):
-                for i in xrange(num_questions):
+                for i in range(num_questions):
                     verify_pok_plaintext(pubkeys[i], vote['proofs'][i], vote['choices'][i])
 
         if hash is not None and not found:
             print("* ERROR: vote hash %s NOT FOUND" % hash)
-            sys.exit(1)
+            raise Exception()
 
 if __name__ == "__main__":
     RANDOM_SOURCE=".rnd"
@@ -93,16 +94,16 @@ if __name__ == "__main__":
     print("* extracted to " + dir_path)
 
     tally = tally.do_dirtally(dir_path)
-    tally_s = json.dumps(tally)
+    tally_s = json.dumps(tally, sort_keys=True, indent=4)
 
     print("# Results ##########################################")
     i = 1
     for q in tally['counts']:
         print("Question #%d: %s\n" % (i, q['question']))
         i += 1
-        print("total number of votes (including invalid ones): %d" % q['total_votes'])
+        print("total number of votes (including blank/invalid votes): %d" % q['total_votes'])
         print("number of options available: %d" % len(q['answers']))
-        print("\nWinning options:")
+        print("\nRaw winning options (unordered!):")
         for opt in q['winners']:
             print(" - %s" % opt)
         print("####################################################\n")
@@ -110,59 +111,65 @@ if __name__ == "__main__":
     pubkeys_path = os.path.join(dir_path, "pubkeys_json")
     pubkeys = json.loads(open(pubkeys_path).read())
     print("* verifying proofs of knowledge of the plaintexts...")
-    verify_votes_pok(pubkeys, os.path.join(dir_path, 'ciphertexts_json'), tally, hash)
-    print("* proofs of knowledge of plaintexts OK")
+    try:
+        verify_votes_pok(pubkeys, os.path.join(dir_path, 'ciphertexts_json'), tally, hash)
+        print("* proofs of knowledge of plaintexts OK")
 
-    if hash is not None:
-        print("* ballot hash verification OK")
-        sys.exit(0)
+        if hash is not None:
+            print("* ballot hash verification OK")
+            shutil.rmtree(dir_path)
+            sys.exit(0)
 
-    tallyfile = dir_path + "/result_json"
+        tallyfile = dir_path + "/result_json"
 
-    hashone = hashlib.md5(open(tallyfile).read()).hexdigest()
-    hashtwo = hashlib.md5(tally_s).hexdigest()
-    if (hashone != hashtwo):
-        print("* tally verification FAILED")
+        hashone = hashlib.md5(open(tallyfile).read()).hexdigest()
+        hashtwo = hashlib.md5(tally_s).hexdigest()
+        #TODO: fix when we have integration with agora-tongo
+        if (hashone != hashtwo):
+            print("* tally verification FAILED")
+            sys.exit(1)
+
+        print("* tally verification OK")
+
+        print("* running './pverify.sh " + RANDOM_SOURCE + " " + dir_path + "'")
+        subprocess.call(['./pverify.sh', RANDOM_SOURCE, dir_path])
+
+        # check if plaintexts_json is generated correctly from the already verified
+        # plaintexts raw proofs
+        i = 0
+        ldir = os.listdir(dir_path)
+        ldir.sort()
+        for question_dir in ldir:
+            question_path = os.path.join(dir_path, question_dir)
+            if not os.path.isdir(question_path):
+                continue
+
+            print("* processing question_dir " + question_dir)
+
+            if not question_dir.startswith("%d-" % i):
+                print("* invalid question dirname FAILED")
+                raise Exception()
+
+            if i >= len(tally["counts"]):
+                print("* invalid question dirname FAILED")
+                raise Exception()
+
+
+            print("* running 'vmnc -plain -outi json proofs/PlaintextElements.bt "
+                "plaintexts_json2'")
+            subprocess.call(["vmnc", "-plain", "-outi", "json",
+                            "proofs/PlaintextElements.bt", "plaintexts_json2"],
+                            cwd=question_path)
+            path1 = os.path.join(dir_path, question_dir, "plaintexts_json")
+            path2 = os.path.join(dir_path, question_dir, "plaintexts_json2")
+
+            hash1 = hashlib.md5(open(path1).read()).hexdigest()
+            hash2 = hashlib.md5(open(path2).read()).hexdigest()
+            if (hash1 != hash2):
+                print("* plaintexts_json generation FAILED")
+                raise Exception()
+            print("* plaintexts_json generation OK")
+            i += 1
+    except:
+        shutil.rmtree(dir_path)
         sys.exit(1)
-
-    print("* tally verification OK")
-
-    print("* running './pverify.sh " + RANDOM_SOURCE + " " + dir_path + "'")
-    subprocess.call(['./pverify.sh', RANDOM_SOURCE, dir_path])
-
-    # check if plaintexts_json is generated correctly from the already verified
-    # plaintexts raw proofs
-    i = 0
-    ldir = os.listdir(dir_path)
-    ldir.sort()
-    for question_dir in ldir:
-        question_path = os.path.join(dir_path, question_dir)
-        if not os.path.isdir(question_path):
-            continue
-
-        print "* processing question_dir " + question_dir
-
-        if not question_dir.startswith("%d-" % i):
-            print("* invalid question dirname FAILED")
-            sys.exit(1)
-
-        if i >= len(tally["counts"]):
-            print("* invalid question dirname FAILED")
-            sys.exit(1)
-
-
-        print("* running 'vmnc -plain -outi json proofs/PlaintextElements.bt "
-              "plaintexts_json2'")
-        subprocess.call(["vmnc", "-plain", "-outi", "json",
-                        "proofs/PlaintextElements.bt", "plaintexts_json2"],
-                        cwd=question_path)
-        path1 = os.path.join(dir_path, question_dir, "plaintexts_json")
-        path2 = os.path.join(dir_path, question_dir, "plaintexts_json2")
-
-        hash1 = hashlib.md5(open(path1).read()).hexdigest()
-        hash2 = hashlib.md5(open(path2).read()).hexdigest()
-        if (hash1 != hash2):
-            print("* plaintexts_json generation FAILED")
-            sys.exit(1)
-        print("* plaintexts_json generation OK")
-        i += 1
