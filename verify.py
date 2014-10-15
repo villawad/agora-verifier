@@ -44,7 +44,7 @@ def verify_pok_plaintext(pk, proof, ciphertext):
 
     # verify the challenge is valid
     hash = hashlib.sha256()
-    hash.update(str(alpha) + "/" + str(commitment))
+    hash.update(("%d/%d" % (alpha, commitment)).encode('utf-8'))
     challenge_calculated = int(hash.hexdigest(), 16)
     assert challenge_calculated == challenge
 
@@ -122,8 +122,8 @@ if __name__ == "__main__":
 
         tallyfile = dir_path + "/result_json"
 
-        hashone = hashlib.md5(open(tallyfile).read()).hexdigest()
-        hashtwo = hashlib.md5(tally_s).hexdigest()
+        hashone = hashlib.md5(open(tallyfile).read().encode('utf-8')).hexdigest()
+        hashtwo = hashlib.md5(tally_s.encode('utf-8')).hexdigest()
         #TODO: fix when we have integration with agora-tongo
         if (hashone != hashtwo):
             print("* tally verification FAILED")
