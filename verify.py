@@ -65,7 +65,7 @@ def verify_votes_pok(pubkeys, path, tally, hash):
         found = False
         for line in votes_file:
             vote = json.loads(line)
-            if hash and not found and hashlib.sha256(line[:-1]).hexdigest() == hash:
+            if hash and not found and hashlib.sha256(line[:-1].encode('utf-8')).hexdigest() == hash:
                 found = True
                 print("* Hash of the vote was successfully found: %s" % line)
 
@@ -163,8 +163,8 @@ if __name__ == "__main__":
             path1 = os.path.join(dir_path, question_dir, "plaintexts_json")
             path2 = os.path.join(dir_path, question_dir, "plaintexts_json2")
 
-            hash1 = hashlib.md5(open(path1).read()).hexdigest()
-            hash2 = hashlib.md5(open(path2).read()).hexdigest()
+            hash1 = hashlib.md5(open(path1).read().encode('utf-8')).hexdigest()
+            hash2 = hashlib.md5(open(path2).read().encode('utf-8')).hexdigest()
             if (hash1 != hash2):
                 print("* plaintexts_json generation FAILED")
                 raise Exception()
