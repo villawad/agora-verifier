@@ -11,7 +11,7 @@ You need
 * java (version 7)
 * sbt
 * the agora_tally directory of the agora-tally project (clone then copy subdir to root of agora-verifier)
-* the openstv project (git clone https://github.com/OpenTechStrategies/openstv.git)
+* the openstv directory of the openstv project (git clone https://github.com/OpenTechStrategies/openstv.git; mv openstv openstv2; mv openstv2/openstv .; rm -rf openstv2)
 * uuencode (apt-get install sharutils)
 
 Packaging
