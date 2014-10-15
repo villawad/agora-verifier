@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from agora_tally import tally
 import sys
@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import json
 import tarfile
+import traceback
 from tempfile import mkdtemp
 
 
@@ -23,7 +24,6 @@ def verify_pok_plaintext(pk, proof, ciphertext):
           integers.
     # http://courses.csail.mit.edu/6.897/spring04/L19.pdf - 2.1 Proving Knowledge of Plaintext
     '''
-
     pk_p = pk['p']
     pk_g = pk['g']
     commitment = int(proof['commitment'])
@@ -170,6 +170,8 @@ if __name__ == "__main__":
                 raise Exception()
             print("* plaintexts_json generation OK")
             i += 1
-    except:
+    except Exception as e:
+        print("* tally verification FAILED due to an error processing it:")
+        traceback.print_exc()
         shutil.rmtree(dir_path)
         sys.exit(1)
