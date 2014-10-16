@@ -22,6 +22,8 @@ ProguardKeys.options in Proguard ++= Seq("-dontnote", "-dontwarn", "-ignorewarni
 
 ProguardKeys.options in Proguard += ProguardOptions.keepMain("org.agoravoting.agora.Verifier")
 
+ProguardKeys.options in Proguard += ProguardOptions.keepMain("org.agoravoting.agora.Vmnc")
+
 ProguardKeys.options in Proguard += "-keep class verificatum.crypto.RandomDevice { *; }"
 
 ProguardKeys.options in Proguard += "-keep class verificatum.arithm.ModPGroup { *; }"

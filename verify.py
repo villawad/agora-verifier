@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
         print("* tally verification OK")
 
-        print("* running './pverify.sh " + RANDOM_SOURCE + " " + dir_path + "'")
+        print("* running './pverify.sh " + str(RANDOM_SOURCE) + " " + dir_path + "'")
         subprocess.call(['./pverify.sh', RANDOM_SOURCE, dir_path])
 
         # check if plaintexts_json is generated correctly from the already verified
@@ -155,12 +155,18 @@ if __name__ == "__main__":
                 print("* invalid question dirname FAILED")
                 raise Exception()
 
+            cwd = os.getcwd()
+            vmnc = os.path.join(os.getcwd(), "vmnc.sh")
 
-            print("* running 'vmnc -plain -outi json proofs/PlaintextElements.bt "
+            print("* running '" + vmnc + " " + str(RANDOM_SOURCE) + " -plain -outi json proofs/PlaintextElements.bt "
                 "plaintexts_json2'")
-            subprocess.call(["vmnc", "-plain", "-outi", "json",
+            #subprocess.call(["vmnc", "-plain", "-outi", "json",
+            #                "proofs/PlaintextElements.bt", "plaintexts_json2"],
+            #                cwd=question_path)
+            subprocess.call([vmnc, RANDOM_SOURCE, "-plain", "-outi", "json",
                             "proofs/PlaintextElements.bt", "plaintexts_json2"],
                             cwd=question_path)
+
             path1 = os.path.join(dir_path, question_dir, "plaintexts_json")
             path2 = os.path.join(dir_path, question_dir, "plaintexts_json2")
 
