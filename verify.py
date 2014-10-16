@@ -94,7 +94,7 @@ if __name__ == "__main__":
     print("* extracted to " + dir_path)
 
     tally = tally.do_dirtally(dir_path)
-    tally_s = json.dumps(tally, sort_keys=True, indent=4)
+    tally_s = json.dumps(tally, sort_keys=True, indent=4, separators=(',', ': '))
 
     print("# Results ##########################################")
     i = 1
@@ -124,6 +124,7 @@ if __name__ == "__main__":
 
         hashone = hashlib.md5(open(tallyfile).read().encode('utf-8')).hexdigest()
         hashtwo = hashlib.md5(tally_s.encode('utf-8')).hexdigest()
+
         #TODO: fix when we have integration with agora-tongo
         if (hashone != hashtwo):
             print("* tally verification FAILED")
