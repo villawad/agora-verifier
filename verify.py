@@ -55,6 +55,7 @@ def verify_pok_plaintext(pk, proof, ciphertext):
     assert first_part == second_part
 
 def verify_votes_pok(pubkeys, path, tally, hash):
+    num_invalid_votes = 0
     with open(path, mode='r') as votes_file:
         num_questions = len(tally['counts'])
 
@@ -63,19 +64,27 @@ def verify_votes_pok(pubkeys, path, tally, hash):
             pubkeys[i]['p'] = int(pubkeys[i]['p'])
 
         found = False
+        linenum = 0
         for line in votes_file:
             vote = json.loads(line)
+            linenum += 1
+            if linenum % 1000 == 0:
+                print("* verified %d votes (%d invalid)" % (linenum, num_invalid_votes))
             if hash and not found and hashlib.sha256(line[:-1].encode('utf-8')).hexdigest() == hash:
                 found = True
                 print("* Hash of the vote was successfully found: %s" % line)
 
             if not hash or (hash is not None and found):
                 for i in range(num_questions):
-                    verify_pok_plaintext(pubkeys[i], vote['proofs'][i], vote['choices'][i])
+                    try:
+                        verify_pok_plaintext(pubkeys[i], vote['proofs'][i], vote['choices'][i])
+                    except:
+                        num_invalid_votes += 1
 
         if hash is not None and not found:
             print("* ERROR: vote hash %s NOT FOUND" % hash)
             raise Exception()
+    return num_invalid_votes
 
 if __name__ == "__main__":
     RANDOM_SOURCE=".rnd"
@@ -93,12 +102,14 @@ if __name__ == "__main__":
     tally_gz.extractall(path=dir_path)
     print("* extracted to " + dir_path)
 
-    tally = tally.do_dirtally(dir_path)
-    tally_s = json.dumps(tally, sort_keys=True, indent=4, separators=(',', ': '))
+    tallyfile = dir_path + "/result_json"
+    tallyfile_s = open(tallyfile).read()
+    tallyfile_json = json.loads(tallyfile_s)
+    hashone = hashlib.md5(tallyfile_s.encode('utf-8')).hexdigest()
 
     print("# Results ##########################################")
     i = 1
-    for q in tally['counts']:
+    for q in tallyfile_json['counts']:
         print("Question #%d: %s\n" % (i, q['question']))
         i += 1
         print("total number of votes (including blank/invalid votes): %d" % q['total_votes'])
@@ -110,19 +121,25 @@ if __name__ == "__main__":
 
     pubkeys_path = os.path.join(dir_path, "pubkeys_json")
     pubkeys = json.loads(open(pubkeys_path).read())
+
     print("* verifying proofs of knowledge of the plaintexts...")
     try:
-        verify_votes_pok(pubkeys, os.path.join(dir_path, 'ciphertexts_json'), tally, hash)
-        print("* proofs of knowledge of plaintexts OK")
+        num_encrypted_invalid_votes = verify_votes_pok(
+            pubkeys,
+            os.path.join(dir_path, 'ciphertexts_json'),
+            tallyfile_json,
+            hash)
+        print("* proofs of knowledge of plaintexts OK (%d invalid)" % num_encrypted_invalid_votes)
 
         if hash is not None:
             print("* ballot hash verification OK")
             shutil.rmtree(dir_path)
             sys.exit(0)
 
-        tallyfile = dir_path + "/result_json"
-
-        hashone = hashlib.md5(open(tallyfile).read().encode('utf-8')).hexdigest()
+        tally = tally.do_dirtally(
+            dir_path,
+            encrypted_invalid_votes=num_encrypted_invalid_votes)
+        tally_s = json.dumps(tally, sort_keys=True, indent=4, separators=(',', ': '))
         hashtwo = hashlib.md5(tally_s.encode('utf-8')).hexdigest()
 
         #TODO: fix when we have integration with agora-tongo
