@@ -56,6 +56,7 @@ def verify_pok_plaintext(pk, proof, ciphertext):
 
 def verify_votes_pok(pubkeys, path, tally, hash):
     num_invalid_votes = 0
+    linenum = 0
     with open(path, mode='r') as votes_file:
         num_questions = len(tally['counts'])
 
@@ -64,12 +65,11 @@ def verify_votes_pok(pubkeys, path, tally, hash):
             pubkeys[i]['p'] = int(pubkeys[i]['p'])
 
         found = False
-        linenum = 0
         for line in votes_file:
             vote = json.loads(line)
             linenum += 1
             if linenum % 1000 == 0:
-                print("* verified %d votes (%d invalid)" % (linenum, num_invalid_votes))
+                print("* verified %d votes (%d invalid).." % (linenum, num_invalid_votes))
             if hash and not found and hashlib.sha256(line[:-1].encode('utf-8')).hexdigest() == hash:
                 found = True
                 print("* Hash of the vote was successfully found: %s" % line)
@@ -84,6 +84,7 @@ def verify_votes_pok(pubkeys, path, tally, hash):
         if hash is not None and not found:
             print("* ERROR: vote hash %s NOT FOUND" % hash)
             raise Exception()
+    print("* ..finished. Verified %d votes (%d invalid)" % (linenum, num_invalid_votes))
     return num_invalid_votes
 
 if __name__ == "__main__":
@@ -109,10 +110,10 @@ if __name__ == "__main__":
 
     print("# Results ##########################################")
     i = 1
+    print("total number of votes (including blank/invalid votes): %d" % tallyfile_json['total_votes'])
     for q in tallyfile_json['counts']:
         print("Question #%d: %s\n" % (i, q['question']))
         i += 1
-        print("total number of votes (including blank/invalid votes): %d" % q['total_votes'])
         print("number of options available: %d" % len(q['answers']))
         print("\nRaw winning options (unordered!):")
         for opt in q['winners']:
@@ -129,6 +130,7 @@ if __name__ == "__main__":
             os.path.join(dir_path, 'ciphertexts_json'),
             tallyfile_json,
             hash)
+        num_encrypted_invalid_votes = 0
         print("* proofs of knowledge of plaintexts OK (%d invalid)" % num_encrypted_invalid_votes)
 
         if hash is not None:
@@ -187,12 +189,14 @@ if __name__ == "__main__":
             path1 = os.path.join(dir_path, question_dir, "plaintexts_json")
             path2 = os.path.join(dir_path, question_dir, "plaintexts_json2")
 
-            hash1 = hashlib.md5(open(path1).read().encode('utf-8')).hexdigest()
-            hash2 = hashlib.md5(open(path2).read().encode('utf-8')).hexdigest()
+            path1_s = open(path1).read()
+            path2_s = open(path2).read()
+            hash1 = hashlib.md5(path1_s.encode('utf-8')).hexdigest()
+            hash2 = hashlib.md5(path2_s.encode('utf-8')).hexdigest()
             if (hash1 != hash2):
-                print("* plaintexts_json generation FAILED")
+                print("* plaintexts_json verification FAILED")
                 raise Exception()
-            print("* plaintexts_json generation OK")
+            print("* plaintexts_json verification OK")
             i += 1
     except Exception as e:
         print("* tally verification FAILED due to an error processing it:")
