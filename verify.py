@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from agora_tally import tally
+from agora_tally import tally as agora_tally
 import sys
 import os
 import hashlib
@@ -138,7 +138,7 @@ if __name__ == "__main__":
             shutil.rmtree(dir_path)
             sys.exit(0)
 
-        tally = tally.do_dirtally(
+        tally = agora_tally.do_dirtally(
             dir_path,
             encrypted_invalid_votes=num_encrypted_invalid_votes)
         tally_s = json.dumps(tally, sort_keys=True, indent=4, separators=(',', ': '))
