@@ -170,7 +170,10 @@ if __name__ == "__main__":
         print("* tally verification OK")
 
         print("* running './pverify.sh " + str(RANDOM_SOURCE) + " " + dir_path + "'")
-        subprocess.call(['./pverify.sh', RANDOM_SOURCE, dir_path])
+        pverify_ret = subprocess.call(['./pverify.sh', RANDOM_SOURCE, dir_path])
+        if (pverify_ret != 0):
+            print("* mixing and decryption verification FAILED")
+            raise Exception()
 
         # check if plaintexts_json is generated correctly from the already verified
         # plaintexts raw proofs

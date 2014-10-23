@@ -47,13 +47,15 @@ object Verifier extends App {
         if(!baos.toString.contains("Verification completed SUCCESSFULLY")) {
           throw new Exception(s"proofs verification failed on path $directory")
         }
+
 //        val plainLines = io.Source.fromFile(plainText).getLines.toList
 //        val options = plainLines.groupBy(x => x).mapValues(_.size)
 //        println(s"> totals $options")
       }
+      System.setSecurityManager(null)
     } match {
-      case Success(_) => println("* verification is OK")
-      case Failure(e) => println("* verification FAILED"); e.printStackTrace()
+      case Success(_) => println("* verification is OK");
+      case Failure(e) => println("* verification FAILED"); e.printStackTrace(); System.exit(1);
     }
   }
 
