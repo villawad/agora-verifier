@@ -17,7 +17,7 @@ object Vmnc extends App {
 
       // tap output
       val baos = new java.io.ByteArrayOutputStream();
-      System.setOut(new OutTap(baos))
+//       System.setOut(new OutTap(baos))
 
       try {
         val prefix = Array("vmnc", randomSource, "")
