@@ -112,12 +112,12 @@ object Verifier extends App {
 // to tap System.out
 class OutTap(val baos: ByteArrayOutputStream) extends PrintStream(baos) {
   override def println(s: String) = {
-    super.println(s)
-    Console.println
+//     super.println(s)
+//     Console.println
   }
   override def print(s: String) = {
-    super.print(s)
-    Console.print(s"* $s")
+//     super.print(s)
+//     Console.print(s"* $s")
   }
 }
 

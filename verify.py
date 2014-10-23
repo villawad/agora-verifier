@@ -54,11 +54,21 @@ def verify_pok_plaintext(pk, proof, ciphertext):
     # check g^response == commitment * (g^t) ^ challenge == commitment * (alpha) ^ challenge
     assert first_part == second_part
 
-def verify_votes_pok(pubkeys, path, tally, hash):
+def verify_votes_pok(pubkeys, dir_path, tally, hash):
     num_invalid_votes = 0
     linenum = 0
-    with open(path, mode='r') as votes_file:
+    with open(os.path.join(dir_path, 'ciphertexts_json'), mode='r') as votes_file:
         num_questions = len(tally['counts'])
+        # we will write the ciphertexts for each question in here
+        outvotes_files = []
+        ldir = os.listdir(dir_path)
+        ldir.sort()
+        for question_dir in ldir:
+            question_path = os.path.join(dir_path, question_dir)
+            if not os.path.isdir(question_path):
+              continue
+            outvotes_path = os.path.join(question_path, 'ciphertexts_json')
+            outvotes_files.append(open(outvotes_path, 'w'))
 
         for i in range(num_questions):
             pubkeys[i]['g'] = int(pubkeys[i]['g'])
@@ -68,6 +78,13 @@ def verify_votes_pok(pubkeys, path, tally, hash):
         for line in votes_file:
             vote = json.loads(line)
             linenum += 1
+
+            choice_num = 0
+            for f in outvotes_files:
+              f.write(json.dumps(vote['choices'][choice_num], separators=(",", ":")))
+              f.write("\n")
+              choice_num += 1
+
             if linenum % 1000 == 0:
                 print("* verified %d votes (%d invalid).." % (linenum, num_invalid_votes))
             if hash and not found and hashlib.sha256(line[:-1].encode('utf-8')).hexdigest() == hash:
@@ -81,6 +98,8 @@ def verify_votes_pok(pubkeys, path, tally, hash):
                     except:
                         num_invalid_votes += 1
 
+        for f in outvotes_files:
+          f.close()
         if hash is not None and not found:
             print("* ERROR: vote hash %s NOT FOUND" % hash)
             raise Exception()
@@ -127,7 +146,7 @@ if __name__ == "__main__":
     try:
         num_encrypted_invalid_votes = verify_votes_pok(
             pubkeys,
-            os.path.join(dir_path, 'ciphertexts_json'),
+            dir_path,
             tallyfile_json,
             hash)
         print("* proofs of knowledge of plaintexts OK (%d invalid)" % num_encrypted_invalid_votes)
@@ -176,11 +195,9 @@ if __name__ == "__main__":
             cwd = os.getcwd()
             vmnc = os.path.join(os.getcwd(), "vmnc.sh")
 
+            # verify plaintexts raw conversion
             print("* running '" + vmnc + " " + str(RANDOM_SOURCE) + " -plain -outi json proofs/PlaintextElements.bt "
                 "plaintexts_json2'")
-            #subprocess.call(["vmnc", "-plain", "-outi", "json",
-            #                "proofs/PlaintextElements.bt", "plaintexts_json2"],
-            #                cwd=question_path)
             subprocess.call([vmnc, RANDOM_SOURCE, "-plain", "-outi", "json",
                             "proofs/PlaintextElements.bt", "plaintexts_json2"],
                             cwd=question_path)
@@ -196,6 +213,26 @@ if __name__ == "__main__":
                 print("* plaintexts_json verification FAILED")
                 raise Exception()
             print("* plaintexts_json verification OK")
+
+
+            # verify ciphertexts raw conversion
+            print("* running '" + vmnc + " " + str(RANDOM_SOURCE) + " -ciphs -ini json ciphertexts_json ciphertexts_raw'")
+            subprocess.call([vmnc, RANDOM_SOURCE, "-ciphs", "-ini", "json",
+                            "ciphertexts_json", "ciphertexts_raw"],
+                            cwd=question_path)
+
+            path1 = os.path.join(dir_path, question_dir, "ciphertexts_raw")
+            path2 = os.path.join(dir_path, question_dir, "proofs", "CiphertextList00.bt")
+
+            path1_s = open(path1, "rb").read()
+            path2_s = open(path2, "rb").read()
+            hash1 = hashlib.md5(path1_s).hexdigest()
+            hash2 = hashlib.md5(path2_s).hexdigest()
+            if (hash1 != hash2):
+                print("* ciphertexts_json verification FAILED")
+                raise Exception()
+            print("* ciphertexts_json verification OK")
+
             i += 1
     except Exception as e:
         print("* tally verification FAILED due to an error processing it:")
