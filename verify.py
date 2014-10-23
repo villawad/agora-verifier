@@ -130,7 +130,6 @@ if __name__ == "__main__":
             os.path.join(dir_path, 'ciphertexts_json'),
             tallyfile_json,
             hash)
-        num_encrypted_invalid_votes = 0
         print("* proofs of knowledge of plaintexts OK (%d invalid)" % num_encrypted_invalid_votes)
 
         if hash is not None:
