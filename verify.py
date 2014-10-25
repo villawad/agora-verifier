@@ -3,6 +3,7 @@
 from agora_tally import tally as agora_tally
 import sys
 import os
+import signal
 import hashlib
 import shutil
 import subprocess
@@ -118,6 +119,14 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         hash = sys.argv[2]
         print("* Vote hash %s given, we will search the corresponding ballot.." % hash)
+
+
+    def sig_handler(signum, frame):
+        print("\nTerminating: deleting temporal files..")
+        shutil.rmtree(dir_path)
+        exit(1)
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
 
     tally_gz.extractall(path=dir_path)
     print("* extracted to " + dir_path)
@@ -240,5 +249,6 @@ if __name__ == "__main__":
     except Exception as e:
         print("* tally verification FAILED due to an error processing it:")
         traceback.print_exc()
-        shutil.rmtree(dir_path)
+        if os.path.exists(dir_path):
+            shutil.rmtree(dir_path)
         sys.exit(1)
