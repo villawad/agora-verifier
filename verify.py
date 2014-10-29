@@ -80,11 +80,6 @@ def verify_votes_pok(pubkeys, dir_path, tally, hash):
             vote = json.loads(line)
             linenum += 1
 
-            choice_num = 0
-            for f in outvotes_files:
-              f.write(json.dumps(vote['choices'][choice_num], separators=(",", ":")))
-              f.write("\n")
-              choice_num += 1
 
             if linenum % 1000 == 0:
                 print("* verified %d votes (%d invalid).." % (linenum, num_invalid_votes))
@@ -92,12 +87,24 @@ def verify_votes_pok(pubkeys, dir_path, tally, hash):
                 found = True
                 print("* Hash of the vote was successfully found: %s" % line)
 
+            is_invalid = False
             if not hash or (hash is not None and found):
                 for i in range(num_questions):
                     try:
                         verify_pok_plaintext(pubkeys[i], vote['proofs'][i], vote['choices'][i])
                     except:
+                        is_invalid = True
                         num_invalid_votes += 1
+
+            if is_invalid:
+              continue
+
+            choice_num = 0
+            for f in outvotes_files:
+              f.write(json.dumps(vote['choices'][choice_num],
+                  ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+              f.write("\n")
+              choice_num += 1
 
         for f in outvotes_files:
           f.close()
@@ -168,7 +175,8 @@ if __name__ == "__main__":
         tally = agora_tally.do_dirtally(
             dir_path,
             encrypted_invalid_votes=num_encrypted_invalid_votes)
-        tally_s = json.dumps(tally, sort_keys=True, indent=4, separators=(',', ': '))
+        tally_s = json.dumps(tally, sort_keys=True,
+            indent=4, separators=(',', ': '))
         hashtwo = hashlib.md5(tally_s.encode('utf-8')).hexdigest()
 
         #TODO: fix when we have integration with agora-tongo
