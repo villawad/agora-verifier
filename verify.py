@@ -89,12 +89,12 @@ def verify_votes_pok(pubkeys, dir_path, tally, hash):
 
             is_invalid = False
             if not hash or (hash is not None and found):
-                for i in range(num_questions):
-                    try:
+                try:
+                    for i in range(num_questions):
                         verify_pok_plaintext(pubkeys[i], vote['proofs'][i], vote['choices'][i])
-                    except:
-                        is_invalid = True
-                        num_invalid_votes += 1
+                except:
+                    is_invalid = True
+                    num_invalid_votes += 1
 
             if is_invalid:
               continue
