@@ -175,11 +175,11 @@ if __name__ == "__main__":
         tally = agora_tally.do_dirtally(
             dir_path,
             encrypted_invalid_votes=num_encrypted_invalid_votes)
-        tally_s = json.dumps(tally, sort_keys=True,
+        tally_s = json.dumps(tally, sort_keys=True, ensure_ascii=False,
             indent=4, separators=(',', ': '))
         hashtwo = hashlib.md5(tally_s.encode('utf-8')).hexdigest()
 
-        #TODO: fix when we have integration with agora-tongo
+        #TODO: fix when we have integration with agora-results
         if (hashone != hashtwo):
             print("* tally verification FAILED")
             sys.exit(1)
