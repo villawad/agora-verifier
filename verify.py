@@ -59,7 +59,7 @@ def verify_votes_pok(pubkeys, dir_path, tally, hash):
     num_invalid_votes = 0
     linenum = 0
     with open(os.path.join(dir_path, 'ciphertexts_json'), mode='r') as votes_file:
-        num_questions = len(tally['counts'])
+        num_questions = len(tally['questions'])
         # we will write the ciphertexts for each question in here
         outvotes_files = []
         ldir = os.listdir(dir_path)
@@ -117,9 +117,13 @@ def verify_votes_pok(pubkeys, dir_path, tally, hash):
 if __name__ == "__main__":
     RANDOM_SOURCE=".rnd"
 
+    if len(sys.argv) < 2:
+        print('verify.py <tally file> [vote hash]')
+        sys.exit(1)
+
     # untar the plaintexts
     dir_path = mkdtemp("tally")
-    tally_gz = tarfile.open(sys.argv[1], mode="r:gz")
+    tally_gz = tarfile.open(sys.argv[1], mode="r")
 
     # second argument is the hash of the vote
     hash = None
@@ -132,13 +136,22 @@ if __name__ == "__main__":
         print("\nTerminating: deleting temporal files..")
         shutil.rmtree(dir_path)
         exit(1)
+
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)
 
     tally_gz.extractall(path=dir_path)
     print("* extracted to " + dir_path)
 
-    tallyfile = dir_path + "/result_json"
+    tally_raw_file = os.path.join(dir_path, 'tally.tar.gz')
+    tally_raw_gz = tarfile.open(tally_raw_file, mode="r:gz")
+    dir_raw_path = os.path.join(dir_path, 'tally-raw')
+    os.mkdir(dir_raw_path)
+
+    tally_raw_gz.extractall(path=dir_raw_path)
+    print("* extracted raw tally to " + dir_raw_path)
+
+    tallyfile = os.path.join(dir_path, 'results.json')
     tallyfile_s = open(tallyfile).read()
     tallyfile_json = json.loads(tallyfile_s)
     hashone = hashlib.md5(tallyfile_s.encode('utf-8')).hexdigest()
@@ -146,8 +159,8 @@ if __name__ == "__main__":
     print("# Results ##########################################")
     i = 1
     print("total number of votes (including blank/invalid votes): %d" % tallyfile_json['total_votes'])
-    for q in tallyfile_json['counts']:
-        print("Question #%d: %s\n" % (i, q['question']))
+    for q in tallyfile_json['questions']:
+        print("Question #%d: %s\n" % (i, q['title']))
         i += 1
         print("number of options available: %d" % len(q['answers']))
         print("\nRaw winning options (unordered!):")
@@ -155,14 +168,14 @@ if __name__ == "__main__":
             print(" - %s" % opt)
         print("####################################################\n")
 
-    pubkeys_path = os.path.join(dir_path, "pubkeys_json")
+    pubkeys_path = os.path.join(dir_raw_path, "pubkeys_json")
     pubkeys = json.loads(open(pubkeys_path).read())
 
     print("* verifying proofs of knowledge of the plaintexts...")
     try:
         num_encrypted_invalid_votes = verify_votes_pok(
             pubkeys,
-            dir_path,
+            dir_raw_path,
             tallyfile_json,
             hash)
         print("* proofs of knowledge of plaintexts OK (%d invalid)" % num_encrypted_invalid_votes)
@@ -172,22 +185,28 @@ if __name__ == "__main__":
             shutil.rmtree(dir_path)
             sys.exit(0)
 
-        tally = agora_tally.do_dirtally(
-            dir_path,
+        ''' tally = agora_tally.do_dirtally(
+            dir_raw_path,
             encrypted_invalid_votes=num_encrypted_invalid_votes)
         tally_s = json.dumps(tally, sort_keys=True, ensure_ascii=False,
             indent=4, separators=(',', ': '))
+        print("*** " + tally_s)
         hashtwo = hashlib.md5(tally_s.encode('utf-8')).hexdigest()
+        '''
+        results_config_path = os.path.join(dir_path, 'results.config.json')
+        subprocess.call(['./agora-results', '-t', tally_raw_file, '-c', results_config_path])
+        tallyfile_s2 = open('results.json').read()
+        tallyfile_json2 = json.loads(tallyfile_s2)
+        hashtwo = hashlib.md5(tallyfile_s2.encode('utf-8')).hexdigest()
 
-        #TODO: fix when we have integration with agora-results
         if (hashone != hashtwo):
             print("* tally verification FAILED")
             sys.exit(1)
 
         print("* tally verification OK")
 
-        print("* running './pverify.sh " + str(RANDOM_SOURCE) + " " + dir_path + "'")
-        pverify_ret = subprocess.call(['./pverify.sh', RANDOM_SOURCE, dir_path])
+        print("* running './pverify.sh " + str(RANDOM_SOURCE) + " " + dir_raw_path + "'")
+        pverify_ret = subprocess.call(['./pverify.sh', RANDOM_SOURCE, dir_raw_path])
         if (pverify_ret != 0):
             print("* mixing and decryption verification FAILED")
             raise Exception()
@@ -195,10 +214,10 @@ if __name__ == "__main__":
         # check if plaintexts_json is generated correctly from the already verified
         # plaintexts raw proofs
         i = 0
-        ldir = os.listdir(dir_path)
+        ldir = os.listdir(dir_raw_path)
         ldir.sort()
         for question_dir in ldir:
-            question_path = os.path.join(dir_path, question_dir)
+            question_path = os.path.join(dir_raw_path, question_dir)
             if not os.path.isdir(question_path):
                 continue
 
@@ -208,7 +227,7 @@ if __name__ == "__main__":
                 print("* invalid question dirname FAILED")
                 raise Exception()
 
-            if i >= len(tally["counts"]):
+            if i >= len(tallyfile_json2["questions"]):
                 print("* invalid question dirname FAILED")
                 raise Exception()
 
@@ -222,8 +241,8 @@ if __name__ == "__main__":
                             "proofs/PlaintextElements.bt", "plaintexts_json2"],
                             cwd=question_path)
 
-            path1 = os.path.join(dir_path, question_dir, "plaintexts_json")
-            path2 = os.path.join(dir_path, question_dir, "plaintexts_json2")
+            path1 = os.path.join(dir_raw_path, question_dir, "plaintexts_json")
+            path2 = os.path.join(dir_raw_path, question_dir, "plaintexts_json2")
 
             path1_s = open(path1).read()
             path2_s = open(path2).read()
@@ -234,15 +253,14 @@ if __name__ == "__main__":
                 raise Exception()
             print("* plaintexts_json verification OK")
 
-
             # verify ciphertexts raw conversion
             print("* running '" + vmnc + " " + str(RANDOM_SOURCE) + " -ciphs -ini json ciphertexts_json ciphertexts_raw'")
             subprocess.call([vmnc, RANDOM_SOURCE, "-ciphs", "-ini", "json",
                             "ciphertexts_json", "ciphertexts_raw"],
                             cwd=question_path)
 
-            path1 = os.path.join(dir_path, question_dir, "ciphertexts_raw")
-            path2 = os.path.join(dir_path, question_dir, "proofs", "CiphertextList00.bt")
+            path1 = os.path.join(dir_raw_path, question_dir, "ciphertexts_raw")
+            path2 = os.path.join(dir_raw_path, question_dir, "proofs", "CiphertextList00.bt")
 
             path1_s = open(path1, "rb").read()
             path2_s = open(path2, "rb").read()
