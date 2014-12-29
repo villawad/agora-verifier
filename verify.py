@@ -163,9 +163,11 @@ if __name__ == "__main__":
         print("Question #%d: %s\n" % (i, q['title']))
         i += 1
         print("number of options available: %d" % len(q['answers']))
-        print("\nRaw winning options (unordered!):")
-        for opt in q['winners']:
-            print(" - %s" % opt)
+        print("\nRaw winning options (position):")
+        answers = [answer for answer in q['answers'] if answer['winner_position'] is not None]
+        answers.sort(key=lambda answer: answer['winner_position'])
+        for answer in answers:
+            print('%s (%d)' % (answer['text'], answer['winner_position']))
         print("####################################################\n")
 
     pubkeys_path = os.path.join(dir_raw_path, "pubkeys_json")

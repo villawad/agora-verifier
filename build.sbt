@@ -16,6 +16,10 @@ fork in run := true
 
 proguardSettings
 
+// https://github.com/sbt/sbt-proguard/issues/5
+
+// ProguardKeys.proguardVersion in Proguard := "5.0"
+
 ProguardKeys.options in Proguard ++= Seq("-dontnote", "-dontwarn", "-ignorewarnings", "-dontobfuscate")
 
 // ProguardKeys.options in Proguard ++= Seq("-dontnote", "-dontwarn", "-ignorewarnings", "-dontobfuscate", "-dontoptimize")
