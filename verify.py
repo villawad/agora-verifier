@@ -143,140 +143,171 @@ if __name__ == "__main__":
     tally_gz.extractall(path=dir_path)
     print("* extracted to " + dir_path)
 
-    tally_raw_file = os.path.join(dir_path, 'tally.tar.gz')
-    tally_raw_gz = tarfile.open(tally_raw_file, mode="r:gz")
-    dir_raw_path = os.path.join(dir_path, 'tally-raw')
-    os.mkdir(dir_raw_path)
+    # raw tallies
+    tallies = [ f for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f)) and f.endswith('tar.gz')]
+    tallies.sort(key = lambda x: int(x.split('.')[0]))
 
-    tally_raw_gz.extractall(path=dir_raw_path)
-    print("* extracted raw tally to " + dir_raw_path)
+    # first extract tallies in order to run agora-results
+    for next in tallies:
+        number = int(next.split('.')[0])
+        tally_raw_gz = tarfile.open(os.path.join(dir_path, next), mode="r:gz")
+        dir_raw_path = os.path.join(dir_path, 'tally-raw-%d' % number)
+        os.mkdir(dir_raw_path)
+        tally_raw_gz.extractall(path=dir_raw_path)
+        print("* extracted raw tally to " + dir_raw_path)
 
+    # results hash
     tallyfile = os.path.join(dir_path, 'results.json')
     tallyfile_s = open(tallyfile).read()
     tallyfile_json = json.loads(tallyfile_s)
     hashone = hashlib.md5(tallyfile_s.encode('utf-8')).hexdigest()
 
-    print("# Results ##########################################")
-    i = 1
-    print("total number of votes (including blank/invalid votes): %d" % tallyfile_json['total_votes'])
-    for q in tallyfile_json['questions']:
-        print("Question #%d: %s\n" % (i, q['title']))
-        i += 1
-        print("number of options available: %d" % len(q['answers']))
-        print("\nRaw winning options (position):")
-        answers = [answer for answer in q['answers'] if answer['winner_position'] is not None]
-        answers.sort(key=lambda answer: answer['winner_position'])
-        for answer in answers:
-            print('%s (%d)' % (answer['text'], answer['winner_position']))
-        print("####################################################\n")
+    # results hash two
+    results_config_path = os.path.join(dir_path, 'config.json')
+    tally_list = [os.path.join(dir_path, t) for t in tallies]
+    command = ['./agora-results', '-t']
+    command.extend(tally_list)
+    command.extend(['-c', results_config_path, '-s', '-o', 'json'])
+    print('* running %s ' % command)
+    ret = subprocess.check_output(command)
+    tallyfile_json2 = json.loads(ret.decode(encoding='UTF-8'))
+    hashtwo = hashlib.md5(ret).hexdigest()
 
-    pubkeys_path = os.path.join(dir_raw_path, "pubkeys_json")
-    pubkeys = json.loads(open(pubkeys_path).read())
-
-    print("* verifying proofs of knowledge of the plaintexts...")
-    try:
-        num_encrypted_invalid_votes = verify_votes_pok(
-            pubkeys,
-            dir_raw_path,
-            tallyfile_json,
-            hash)
-        print("* proofs of knowledge of plaintexts OK (%d invalid)" % num_encrypted_invalid_votes)
-
-        if hash is not None:
-            print("* ballot hash verification OK")
-            shutil.rmtree(dir_path)
-            sys.exit(0)
-
-        ''' tally = agora_tally.do_dirtally(
-            dir_raw_path,
-            encrypted_invalid_votes=num_encrypted_invalid_votes)
-        tally_s = json.dumps(tally, sort_keys=True, ensure_ascii=False,
-            indent=4, separators=(',', ': '))
-        print("*** " + tally_s)
-        hashtwo = hashlib.md5(tally_s.encode('utf-8')).hexdigest()
-        '''
-        results_config_path = os.path.join(dir_path, 'results.config.json')
-        subprocess.call(['./agora-results', '-t', tally_raw_file, '-c', results_config_path])
-        tallyfile_s2 = open('results.json').read()
-        tallyfile_json2 = json.loads(tallyfile_s2)
-        hashtwo = hashlib.md5(tallyfile_s2.encode('utf-8')).hexdigest()
-
-        if (hashone != hashtwo):
-            print("* tally verification FAILED")
-            sys.exit(1)
-
-        print("* tally verification OK")
-
-        print("* running './pverify.sh " + str(RANDOM_SOURCE) + " " + dir_raw_path + "'")
-        pverify_ret = subprocess.call(['./pverify.sh', RANDOM_SOURCE, dir_raw_path])
-        if (pverify_ret != 0):
-            print("* mixing and decryption verification FAILED")
-            raise Exception()
-
-        # check if plaintexts_json is generated correctly from the already verified
-        # plaintexts raw proofs
-        i = 0
-        ldir = os.listdir(dir_raw_path)
-        ldir.sort()
-        for question_dir in ldir:
-            question_path = os.path.join(dir_raw_path, question_dir)
-            if not os.path.isdir(question_path):
-                continue
-
-            print("* processing question_dir " + question_dir)
-
-            if not question_dir.startswith("%d-" % i):
-                print("* invalid question dirname FAILED")
-                raise Exception()
-
-            if i >= len(tallyfile_json2["questions"]):
-                print("* invalid question dirname FAILED")
-                raise Exception()
-
-            cwd = os.getcwd()
-            vmnc = os.path.join(os.getcwd(), "vmnc.sh")
-
-            # verify plaintexts raw conversion
-            print("* running '" + vmnc + " " + str(RANDOM_SOURCE) + " -plain -outi json proofs/PlaintextElements.bt "
-                "plaintexts_json2'")
-            subprocess.call([vmnc, RANDOM_SOURCE, "-plain", "-outi", "json",
-                            "proofs/PlaintextElements.bt", "plaintexts_json2"],
-                            cwd=question_path)
-
-            path1 = os.path.join(dir_raw_path, question_dir, "plaintexts_json")
-            path2 = os.path.join(dir_raw_path, question_dir, "plaintexts_json2")
-
-            path1_s = open(path1).read()
-            path2_s = open(path2).read()
-            hash1 = hashlib.md5(path1_s.encode('utf-8')).hexdigest()
-            hash2 = hashlib.md5(path2_s.encode('utf-8')).hexdigest()
-            if (hash1 != hash2):
-                print("* plaintexts_json verification FAILED")
-                raise Exception()
-            print("* plaintexts_json verification OK")
-
-            # verify ciphertexts raw conversion
-            print("* running '" + vmnc + " " + str(RANDOM_SOURCE) + " -ciphs -ini json ciphertexts_json ciphertexts_raw'")
-            subprocess.call([vmnc, RANDOM_SOURCE, "-ciphs", "-ini", "json",
-                            "ciphertexts_json", "ciphertexts_raw"],
-                            cwd=question_path)
-
-            path1 = os.path.join(dir_raw_path, question_dir, "ciphertexts_raw")
-            path2 = os.path.join(dir_raw_path, question_dir, "proofs", "CiphertextList00.bt")
-
-            path1_s = open(path1, "rb").read()
-            path2_s = open(path2, "rb").read()
-            hash1 = hashlib.md5(path1_s).hexdigest()
-            hash2 = hashlib.md5(path2_s).hexdigest()
-            if (hash1 != hash2):
-                print("* ciphertexts_json verification FAILED")
-                raise Exception()
-            print("* ciphertexts_json verification OK")
-
-            i += 1
-    except Exception as e:
-        print("* tally verification FAILED due to an error processing it:")
-        traceback.print_exc()
-        if os.path.exists(dir_path):
-            shutil.rmtree(dir_path)
+    if (hashone != hashtwo):
+        print("* tally verification FAILED")
         sys.exit(1)
+
+    print("* results hash verification OK")
+
+    for next in tallies:
+        number = int(next.split('.')[0])
+        dir_raw_path = os.path.join(dir_path, 'tally-raw-%d' % number)
+        print('* processing %s' % dir_raw_path)
+
+        print("# Results ##########################################")
+        i = 1
+        print("total number of votes (including blank/invalid votes): %d" % tallyfile_json['total_votes'])
+        for q in tallyfile_json['questions']:
+            print("Question #%d: %s\n" % (i, q['title']))
+            i += 1
+            print("number of options available: %d" % len(q['answers']))
+            print("\nRaw winning options (position):")
+            answers = [answer for answer in q['answers'] if answer['winner_position'] is not None]
+            answers.sort(key=lambda answer: answer['winner_position'])
+            for answer in answers:
+                print('%s (%d)' % (answer['text'], answer['winner_position']))
+            print("####################################################\n")
+
+        pubkeys_path = os.path.join(dir_raw_path, "pubkeys_json")
+        pubkeys = json.loads(open(pubkeys_path).read())
+
+        print("* verifying proofs of knowledge of the plaintexts...")
+        try:
+            num_encrypted_invalid_votes = verify_votes_pok(
+                pubkeys,
+                dir_raw_path,
+                tallyfile_json,
+                hash)
+            print("* proofs of knowledge of plaintexts OK (%d invalid)" % num_encrypted_invalid_votes)
+
+            if hash is not None:
+                print("* ballot hash verification OK")
+                shutil.rmtree(dir_path)
+                sys.exit(0)
+
+            ''' tally = agora_tally.do_dirtally(
+                dir_raw_path,
+                encrypted_invalid_votes=num_encrypted_invalid_votes)
+            tally_s = json.dumps(tally, sort_keys=True, ensure_ascii=False,
+                indent=4, separators=(',', ': '))
+            print("*** " + tally_s)
+            hashtwo = hashlib.md5(tally_s.encode('utf-8')).hexdigest()
+            '''
+
+            '''
+            results_config_path = os.path.join(dir_path, 'results.config.json')
+            subprocess.call(['./agora-results', '-t', tally_raw_file, '-c', results_config_path])
+            tallyfile_s2 = open('results.json').read()
+            tallyfile_json2 = json.loads(tallyfile_s2)
+            hashtwo = hashlib.md5(tallyfile_s2.encode('utf-8')).hexdigest()
+
+            if (hashone != hashtwo):
+                print("* tally verification FAILED")
+                sys.exit(1)
+
+            print("* tally verification OK")
+            '''
+
+            print("* running './pverify.sh " + str(RANDOM_SOURCE) + " " + dir_raw_path + "'")
+            pverify_ret = subprocess.call(['./pverify.sh', RANDOM_SOURCE, dir_raw_path])
+            if (pverify_ret != 0):
+                print("* mixing and decryption verification FAILED")
+                raise Exception()
+
+            # check if plaintexts_json is generated correctly from the already verified
+            # plaintexts raw proofs
+            i = 0
+            ldir = os.listdir(dir_raw_path)
+            ldir.sort()
+            for question_dir in ldir:
+                question_path = os.path.join(dir_raw_path, question_dir)
+                if not os.path.isdir(question_path):
+                    continue
+
+                print("* processing question_dir " + question_dir)
+
+                if not question_dir.startswith("%d-" % i):
+                    print("* invalid question dirname FAILED")
+                    raise Exception()
+
+                if i >= len(tallyfile_json2["questions"]):
+                    print("* invalid question dirname FAILED")
+                    raise Exception()
+
+                cwd = os.getcwd()
+                vmnc = os.path.join(os.getcwd(), "vmnc.sh")
+
+                # verify plaintexts raw conversion
+                print("* running '" + vmnc + " " + str(RANDOM_SOURCE) + " -plain -outi json proofs/PlaintextElements.bt "
+                    "plaintexts_json2'")
+                subprocess.call([vmnc, RANDOM_SOURCE, "-plain", "-outi", "json",
+                                "proofs/PlaintextElements.bt", "plaintexts_json2"],
+                                cwd=question_path)
+
+                path1 = os.path.join(dir_raw_path, question_dir, "plaintexts_json")
+                path2 = os.path.join(dir_raw_path, question_dir, "plaintexts_json2")
+
+                path1_s = open(path1).read()
+                path2_s = open(path2).read()
+                hash1 = hashlib.md5(path1_s.encode('utf-8')).hexdigest()
+                hash2 = hashlib.md5(path2_s.encode('utf-8')).hexdigest()
+                if (hash1 != hash2):
+                    print("* plaintexts_json verification FAILED")
+                    raise Exception()
+                print("* plaintexts_json verification OK")
+
+                # verify ciphertexts raw conversion
+                print("* running '" + vmnc + " " + str(RANDOM_SOURCE) + " -ciphs -ini json ciphertexts_json ciphertexts_raw'")
+                subprocess.call([vmnc, RANDOM_SOURCE, "-ciphs", "-ini", "json",
+                                "ciphertexts_json", "ciphertexts_raw"],
+                                cwd=question_path)
+
+                path1 = os.path.join(dir_raw_path, question_dir, "ciphertexts_raw")
+                path2 = os.path.join(dir_raw_path, question_dir, "proofs", "CiphertextList00.bt")
+
+                path1_s = open(path1, "rb").read()
+                path2_s = open(path2, "rb").read()
+                hash1 = hashlib.md5(path1_s).hexdigest()
+                hash2 = hashlib.md5(path2_s).hexdigest()
+                if (hash1 != hash2):
+                    print("* ciphertexts_json verification FAILED")
+                    raise Exception()
+                print("* ciphertexts_json verification OK")
+
+                i += 1
+        except Exception as e:
+            print("* tally verification FAILED due to an error processing it:")
+            traceback.print_exc()
+            if os.path.exists(dir_path):
+                shutil.rmtree(dir_path)
+            sys.exit(1)
