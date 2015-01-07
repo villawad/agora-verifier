@@ -115,6 +115,12 @@ def verify_votes_pok(pubkeys, dir_path, tally, hash):
     return num_invalid_votes
 
 if __name__ == "__main__":
+
+    v = sys.version_info
+    if v.major < 3 or v.minor < 3:
+        print("python3 must be at least 3.3, but it's %d.%d" % (v.major, v.minor))
+        sys.exit(1)
+
     RANDOM_SOURCE=".rnd"
 
     if len(sys.argv) < 2:
